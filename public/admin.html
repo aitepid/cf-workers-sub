@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; }
+        .header { background: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 18px; color: #333; }
+        .logout-btn { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; text-decoration: none; font-size: 14px; }
+        .logout-btn:hover { background: #c82333; }
+        .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
+        .card { background: white; border-radius: 10px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .card h3 { margin-bottom: 16px; color: #444; }
+        pre { background: #f8f9fa; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+        .sub-link { background: #e8f0fe; color: #1a73e8; padding: 12px; border-radius: 6px; text-decoration: none; display: block; margin: 8px 0; word-break: break-all; }
+        .sub-link:hover { background: #d2e3fc; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .tag { display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 Proxy Admin Panel</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+    <div class="container">
+        <div class="card">
+            <h3>ℹ️ Configuration</h3>
+            <pre id="configLoading">Loading...</pre>
+        </div>
+        <div class="card">
+            <h3>📡 Subscription Links</h3>
+            <p style="color:#666;font-size:13px;margin-bottom:12px;">Share these links with your users:</p>
+            <div id="subsLoading">Loading...</div>
+        </div>
+        <div class="card">
+            <h3>🔍 Proxy Health Check</h3>
+            <form id="checkForm" style="display:flex;gap:8px;">
+                <select id="proto" style="padding:8px;border-radius:6px;border:1px solid #ddd;">
+                    <option value="socks5">SOCKS5</option>
+                    <option value="http">HTTP</option>
+                    <option value="https">HTTPS</option>
+                </select>
+                <input type="text" id="proxyAddr" placeholder="proxy:port or user:pass@host:port" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;">
+                <button type="submit" style="padding:8px 16px;background:#1a73e8;color:white;border:none;border-radius:6px;cursor:pointer;">Check</button>
+            </form>
+            <pre id="checkResult" style="margin-top:12px;display:none;"></pre>
+        </div>
+    </div>
+    <script>
+        async function logout() {
+            location.href = '/logout';
+        }
+        
+        async function loadConfig() {
+            try {
+                const res = await fetch('/admin/config.json');
+                if (res.status === 200) {
+                    const data = await res.json();
+                    document.getElementById('configLoading').textContent = JSON.stringify(data, null, 2);
+                } else if (res.status === 404) {
+                    document.getElementById('configLoading').textContent = 'Config not found (KV not bound).';
+                }
+            } catch(e) {
+                document.getElementById('configLoading').textContent = 'Error: ' + e.message;
+            }
+        }
+        
+        async function loadSubs() {
+            try {
+                const res = await fetch('/sub');
+                if (res.ok && res.status !== 404) {
+                    const text = await res.text();
+                    document.getElementById('subsLoading').innerHTML = `<a href="/sub" class="sub-link" target="_blank">${window.location.origin}/sub</a>`;
+                    // Copy button
+                    const btn = document.createElement('button');
+                    btn.textContent = 'Copy URL';
+                    btn.style.cssText = 'background:#e8f0fe;color:#1a73e8;border:1px solid #1a73e8;padding:6px 12px;border-radius:6px;cursor:pointer;';
+                    btn.onclick = () => { navigator.clipboard.writeText(window.location.origin + '/sub'); btn.textContent = 'Copied!'; };
+                    document.getElementById('subsLoading').appendChild(btn);
+                } else {
+                    document.getElementById('subsLoading').textContent = 'Please set up subscription routes.';
+                }
+            } catch(e) {
+                document.getElementById('subsLoading').textContent = 'Error loading subscriptions: ' + e.message;
+            }
+        }
+        
+        document.getElementById('checkForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const proto = document.getElementById('proto').value;
+            const addr = document.getElementById('proxyAddr').value;
+            const resultEl = document.getElementById('checkResult');
+            resultEl.textContent = 'Checking...';
+            resultEl.style.display = 'block';
+            try {
+                const res = await fetch(`/admin/check?${proto}=${encodeURIComponent(addr)}`);
+                const data = await res.json();
+                resultEl.textContent = JSON.stringify(data, null, 2);
+            } catch(err) {
+                resultEl.textContent = 'Error: ' + err.message;
+            }
+        };
+        
+        // Auto-refresh admin page on mount
+        window.onload = () => { loadConfig(); loadSubs(); };
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => { loadConfig(); }, 30000);
+    </script>
+</body>
+</html>
