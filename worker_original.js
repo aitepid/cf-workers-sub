@@ -117,186 +117,7 @@ function 验证输入(值, 选项 = {}) {
 
 //
 let SOCKS5白名单 = ['*tapecontent.net', '*cloudatacdn.com', '*loadshare.org', '*cdn-centaurus.com', 'scholar.google.com'];
-// Local HTML pages served inline (no external dependency)
-const LOGIN_HTML = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Proxy Admin</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        h2 { text-align: center; margin-bottom: 30px; color: #333; }
-        input { width: 100%; padding: 12px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
-        button { width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
-        button:hover { background: #1558b0; }
-        #msg { text-align: center; margin-top: 12px; font-size: 14px; min-height: 20px; }
-        .error { color: #d32f2f; }
-        .success { color: #388e3c; }
-    </style>
-</head>
-<body>
-    <div class="login-box">
-        <h2>🔐 Admin Login</h2>
-        <form id="loginForm">
-            <input type="password" id="password" placeholder="Password" required>
-            <button type="submit">Login</button>
-        </form>
-        <div id="msg"></div>
-    </div>
-    <script>
-        document.getElementById('loginForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const msg = document.getElementById('msg');
-            msg.textContent = 'Logging in...';
-            msg.className = '';
-            try {
-                const res = await fetch('/login', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'password=' + encodeURIComponent(document.getElementById('password').value)
-                });
-                const data = await res.json();
-                if (data.success) {
-                    msg.textContent = 'Success! Redirecting...';
-                    msg.className = 'success';
-                    setTimeout(() => location.href = '/admin', 1000);
-                } else {
-                    msg.textContent = 'Error: ' + data.error;
-                    msg.className = 'error';
-                }
-            } catch(err) {
-                msg.textContent = 'Network error';
-                msg.className = 'error';
-            }
-        };
-    </script>
-</body>
-</html>
-`;
-const ADMIN_HTML = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; }
-        .header { background: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-        .header h1 { font-size: 18px; color: #333; }
-        .logout-btn { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; text-decoration: none; font-size: 14px; }
-        .logout-btn:hover { background: #c82333; }
-        .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
-        .card { background: white; border-radius: 10px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-        .card h3 { margin-bottom: 16px; color: #444; }
-        pre { background: #f8f9fa; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
-        .sub-link { background: #e8f0fe; color: #1a73e8; padding: 12px; border-radius: 6px; text-decoration: none; display: block; margin: 8px 0; word-break: break-all; }
-        .sub-link:hover { background: #d2e3fc; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; font-weight: 600; }
-        .tag { display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🔧 Proxy Admin Panel</h1>
-        <button class="logout-btn" onclick="logout()">Logout</button>
-    </div>
-    <div class="container">
-        <div class="card">
-            <h3>ℹ️ Configuration</h3>
-            <pre id="configLoading">Loading...</pre>
-        </div>
-        <div class="card">
-            <h3>📡 Subscription Links</h3>
-            <p style="color:#666;font-size:13px;margin-bottom:12px;">Share these links with your users:</p>
-            <div id="subsLoading">Loading...</div>
-        </div>
-        <div class="card">
-            <h3>🔍 Proxy Health Check</h3>
-            <form id="checkForm" style="display:flex;gap:8px;">
-                <select id="proto" style="padding:8px;border-radius:6px;border:1px solid #ddd;">
-                    <option value="socks5">SOCKS5</option>
-                    <option value="http">HTTP</option>
-                    <option value="https">HTTPS</option>
-                </select>
-                <input type="text" id="proxyAddr" placeholder="proxy:port or user:pass@host:port" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;">
-                <button type="submit" style="padding:8px 16px;background:#1a73e8;color:white;border:none;border-radius:6px;cursor:pointer;">Check</button>
-            </form>
-            <pre id="checkResult" style="margin-top:12px;display:none;"></pre>
-        </div>
-    </div>
-    <script>
-        async function logout() {
-            location.href = '/logout';
-        }
-        
-        async function loadConfig() {
-            try {
-                const res = await fetch('/admin/config.json');
-                if (res.status === 200) {
-                    const data = await res.json();
-                    document.getElementById('configLoading').textContent = JSON.stringify(data, null, 2);
-                } else if (res.status === 404) {
-                    document.getElementById('configLoading').textContent = 'Config not found (KV not bound).';
-                }
-            } catch(e) {
-                document.getElementById('configLoading').textContent = 'Error: ' + e.message;
-            }
-        }
-        
-        async function loadSubs() {
-            try {
-                const res = await fetch('/sub');
-                if (res.ok && res.status !== 404) {
-                    const text = await res.text();
-                    document.getElementById('subsLoading').innerHTML = \`<a href="/sub" class="sub-link" target="_blank">\${window.location.origin}/sub</a>\`;
-                    // Copy button
-                    const btn = document.createElement('button');
-                    btn.textContent = 'Copy URL';
-                    btn.style.cssText = 'background:#e8f0fe;color:#1a73e8;border:1px solid #1a73e8;padding:6px 12px;border-radius:6px;cursor:pointer;';
-                    btn.onclick = () => { navigator.clipboard.writeText(window.location.origin + '/sub'); btn.textContent = 'Copied!'; };
-                    document.getElementById('subsLoading').appendChild(btn);
-                } else {
-                    document.getElementById('subsLoading').textContent = 'Please set up subscription routes.';
-                }
-            } catch(e) {
-                document.getElementById('subsLoading').textContent = 'Error loading subscriptions: ' + e.message;
-            }
-        }
-        
-        document.getElementById('checkForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const proto = document.getElementById('proto').value;
-            const addr = document.getElementById('proxyAddr').value;
-            const resultEl = document.getElementById('checkResult');
-            resultEl.textContent = 'Checking...';
-            resultEl.style.display = 'block';
-            try {
-                const res = await fetch(\`/admin/check?\${proto}=\${encodeURIComponent(addr)}\`);
-                const data = await res.json();
-                resultEl.textContent = JSON.stringify(data, null, 2);
-            } catch(err) {
-                resultEl.textContent = 'Error: ' + err.message;
-            }
-        };
-        
-        // Auto-refresh admin page on mount
-        window.onload = () => { loadConfig(); loadSubs(); };
-        
-        // Auto-refresh every 30 seconds
-        setInterval(() => { loadConfig(); }, 30000);
-    </script>
-</body>
-</html>
-`;
-const NOADMIN_HTML = `<!DOCTYPE html><html><head><title>Error</title><style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh}.box{text-align:center}<h1>404 - No ADMIN set</h1><p>Please configure the ADMIN environment variable.</p></div></body></html>`;
-const NOKV_HTML = `<!DOCTYPE html><html><head><title>No KV</title><style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh}.box{text-align:center}<h1>Setup Complete</h1><p>KV namespace not bound. Use admin panel on dashboard to manage config.</p></div></body></html>`;
-// Pages静态页面 is no longer used — all HTML is embedded above
+const Pages静态页面 = 'https://edt-pages.github.io';
 ///////////////////////////////////////////////////////全局常量和工具函数///////////////////////////////////////////////
 const WS早期数据最大字节 = 8 * 1024, WS早期数据最大头长度 = Math.ceil(WS早期数据最大字节 * 4 / 3) + 4;
 const 上行合包目标字节 = 16 * 1024, 上行队列最大字节 = 16 * 1024 * 1024, 上行队列最大条目 = 4096;
@@ -373,7 +194,7 @@ export default {
 			return await 处理XHTTP请求(request, userID, 反代上下文);
 		} else {
 			if (url.protocol === 'http:') return Response.redirect(url.href.replace(`http://${url.hostname}`, `https://${url.hostname}`), 301);
-			return new Response(NOADMIN_HTML, { status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+			if (!管理员密码) return fetch(Pages静态页面 + '/noADMIN').then(r => { const headers = new Headers(r.headers); headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); headers.set('Pragma', 'no-cache'); headers.set('Expires', '0'); return new Response(r.body, { status: 404, statusText: r.statusText, headers }) });
 			if (env.KV && typeof env.KV.get === 'function') {
 				const 区分大小写访问路径 = url.pathname.slice(1);
 				if (区分大小写访问路径 === 加密秘钥 && 加密秘钥 !== '勿动此默认密钥，有需求请自行通过添加变量KEY进行修改') {//快速订阅
@@ -410,7 +231,7 @@ export default {
 						记录错误('Login', `登录失败: ${访问IP}，剩余尝试次数: ${登录最大失败次数 - (登录失败记录.get(访问IP)?.failures || 0)}`);
 						return new Response(JSON.stringify({ success: false, error: '密码错误' }), { status: 401, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 					}
-					return new Response(LOGIN_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+					return fetch(Pages静态页面 + '/login');
 				} else if (访问路径 === 'admin' || 访问路径.startsWith('admin/')) {//验证cookie后响应管理页面
 					const cookies = request.headers.get('Cookie') || '';
 					const authCookie = cookies.split(';').find(c => c.trim().startsWith('auth='))?.split('=')[1];
@@ -609,7 +430,7 @@ export default {
 					}
 
 					ctx.waitUntil(请求日志记录(env, request, 访问IP, 'Admin_Login', config_JSON));
-					return new Response(ADMIN_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+					return fetch(Pages静态页面 + '/admin' + url.search);
 				} else if (访问路径 === 'logout' || uuidRegex.test(访问路径)) {//清除cookie并跳转到登录页面
 					const 响应 = new Response('重定向中...', { status: 302, headers: { 'Location': '/login' } });
 					响应.headers.set('Set-Cookie', 'auth=; Path=/; Max-Age=0; HttpOnly');
@@ -812,7 +633,7 @@ export default {
 					const authCookie = cookies.split(';').find(c => c.trim().startsWith('auth='))?.split('=')[1];
 					if (authCookie && authCookie == await MD5MD5(UA + 加密秘钥 + 管理员密码)) return fetch(new Request('https://speed.cloudflare.com/locations', { headers: { 'Referer': 'https://speed.cloudflare.com/' } }));
 				} else if (访问路径 === 'robots.txt') return new Response('User-agent: *\nDisallow: /', { status: 200, headers: { 'Content-Type': 'text/plain; charset=UTF-8' } });
-			return new Response(NOKV_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+			} else if (!envUUID) return fetch(Pages静态页面 + '/noKV').then(r => { const headers = new Headers(r.headers); headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); headers.set('Pragma', 'no-cache'); headers.set('Expires', '0'); return new Response(r.body, { status: 404, statusText: r.statusText, headers }) });
 		}
 
 		let 伪装页URL = env.URL || 'nginx';

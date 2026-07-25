@@ -1,0 +1,7 @@
+{
+  "name": "cf-workers-sub",
+  "version": "2026-07-11.02:23:18",
+  "description": "Cloudflare Workers proxy subscription server",
+  "type": "module",
+  "main": "dist/index.js"
+}
