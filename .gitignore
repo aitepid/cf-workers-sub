@@ -1,4 +1,16 @@
+# Node modules / build artifacts
 node_modules/
-wrangler.toml
-*.log
+dist/
+
+# Sensitive files
 .env
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp files
+worker_original.js
+split_worker.py
+modules/
