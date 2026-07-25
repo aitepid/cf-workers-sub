@@ -1,8 +1,10 @@
 name = "cf-workers-sub"
 compatibility_date = "2024-01-01"
-main = "src/worker.js"
+main = "_worker.js"
 
+# Variables (override in Cloudflare Dashboard)
 [vars]
-PASSWORD = ""  # Set admin password in Cloudflare Dashboard
+PASSWORD = "change-me-in-dashboard"
 UUID = "5dc15e15-f285-4a9d-959b-0e4fbdd77b63"
 HOST = "githubvpn.tepid.de5.net"
+SUB_PATH = "link"

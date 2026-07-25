@@ -1,138 +1,63 @@
-# Cloudflare Workers Sub — Proxy & Subscription Server
+# Cloudflare Workers Proxy Server v2.0
 
-## Overview
+## 🛡️ 防封禁设计
 
-A self-hosted Cloudflare Workers proxy server that provides:
-- VLESS WebSocket / gRPC / XHTTP protocol proxy
-- Subscription generation (sing-box, Clash, Surge, etc.)
-- Best-IP subscription generator
-- Admin panel with KV-based configuration
-- Proxy health checks
-- Login rate limiting
+- `/` 永远返回正常欢迎页面（欺骗 Cloudflare Crawler）
+- Bot UA 检测（Googlebot / BingBot → 只返回假页面）
+- 代理入口隐藏于 `/api/*` + WebSocket tunnel
+- 登录入口 `/login` 需 POST 才能触发认证
 
-## Quick Start
+## 📦 模块化架构
 
-### 1. Deploy to Cloudflare
+```
+_worker.js          ← 入口文件（路由分发 ~120行）
+├── src/config/     ← 配置加载
+├── src/crypto/     ← MD5/Base64
+├── src/anti-ban/   ← 防封禁
+├── src/auth/       ← JWT 认证
+├── src/proxy/      ← VLESS/Trojan 代理
+├── src/subgen/     ← 订阅生成
+├── src/api/        ← RESTful API
+├── src/admin/      ← Dashboard 管理面板
+└── src/utils/      ← Logger/RateLimiter
+```
+
+## 🚀 部署
+
+### 1. 克隆仓库到 GitHub
 
 ```bash
-# Install wrangler CLI
-npm install -g wrangler
-
-# Initialize project
-wrangler init cf-workers-sub --type=webpack --format=typescript
-
-# Copy worker.js into the project
-cp worker.js src/worker.ts  # or just src/index.ts
-
-# Configure wrangler.toml
-wrangler deploy
+git remote add origin https://github.com/aitepid/cf-workers-sub.git
+git push -u origin main
 ```
 
-### 2. Set Environment Variables (required)
+### 2. Cloudflare Workers 绑定仓库
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `ADMIN` | Admin password (login credential) | `my-secret-password` |
-| `KEY` | Encryption key for auth tokens | Leave blank for default |
-| `UUID` | UUID for version check (auto-generated if not set) | `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx` |
-| `HOST` | Comma-separated list of hostnames (for multi-host support) | `example.com` |
-| `DEBUG` | Enable debug logging (`"1"` or `"true"`) | `1` |
-| `KV` | Cloudflare KV namespace binding (for admin config storage) | `{binding="MY_KV"}` |
+1. Dashboard → Workers & Pages → New Application
+2. Connect to GitHub → 选 `cf-workers-sub` 仓库
+3. Build command: 留空
+4. Deploy command: 留空（CF 自动处理 JS）
+5. 添加环境变量 `PASSWORD`、`UUID`、`HOST`
 
-Add these in the **Cloudflare Dashboard** → Workers → Settings → Variables or via `wrangler.toml`.
+### 3. 绑定自定义域名
 
-### 3. Access Endpoints
+在 Cloudflare DNS 将 `githubvpn.tepid.de5.net` 指向 Worker。
 
-| Endpoint | Description |
-|----------|-------------|
-| `/login` | Admin login page |
-| `/admin` | Admin panel (requires authentication) |
-| `/sub` | Generate subscription links |
-| `/check` | Check proxy health |
-| `/version` | Get version info |
+## 🔌 API 端点
 
-## Configuration
+| 方法 | 路径 | 功能 |
+|------|------|------|
+| POST | `/api/auth/login` | 登录获取 token |
+| GET | `/api/nodes` | 节点列表 |
+| GET | `/api/sub?type=singbox` | Sing-box 订阅 |
+| GET | `/api/check?url=x.com` | 连通性测试 |
+| GET | `/health` | 健康检查（公开） |
 
-All admin settings are stored in **Cloudflare KV** namespace. Bind a KV namespace in your `wrangler.toml`:
+## 💻 CLI 工具
 
-```toml
-[vars]
-ADMIN = "your-admin-password"
-KEY = "your-encryption-key"
-
-[[kv_namespaces]]
-binding = "KV"
-id = "your-kv-namespace-id"
+```bash
+node cli/index.js auth login --password xxx --save
+node cli/index.js sub --format singbox
+node cli/index.js check --url google.com
+node cli/index.js nodes
 ```
-
-## Protocols Supported
-
-- VLESS + WebSocket over TLS
-- VLESS + gRPC over TLS  
-- VLESS + XHTTP over TLS
-- SOCKS5 proxy (via check endpoint)
-- HTTP/HTTPS proxy (via check endpoint)
-- TURN proxy (via check endpoint)
-- SSTP proxy (via check endpoint)
-
-## Features
-
-### Rate Limiting
-- Login attempts are limited to 5 failures per IP
-- Account locked for 30 minutes after max failures
-
-### Multi-Subscription Format Support
-- sing-box
-- Clash / Clash.Meta (Mihomo)
-- Surge
-- Quantumult
-- Mixed format
-
-### Best IP Subscription Generator
-- Automatically probes and ranks IPs
-- Generates optimized node lists
-
-### White List for SOCKS5
-- Custom domain whitelist in `SOCKS5白名单` array
-- Configurable via environment variable `GO2SOCKS5`
-
-## Security Notes
-
-- The proxy uses obfuscated feature strings to avoid detection
-- All client communication is encrypted via TLS
-- Admin panel requires password authentication
-- UUID-based version verification prevents unauthorized access to version API
-- **Important**: Change the default ADMIN password immediately after deployment
-
-## File Structure
-
-```
-.
-├── worker.js          # Main Worker entry point (6284 lines)
-├── wrangler.toml      # Cloudflare Workers configuration
-├── README.md          # This file
-└── package.json       # npm dependencies (if needed)
-```
-
-## Troubleshooting
-
-### Connection Issues
-- Verify your Cloudflare Workers deployment URL is accessible
-- Check that `ADMIN` env var is properly set
-- Ensure KV namespace is bound correctly for admin features
-
-### Login Failures
-- Check rate limiting log — too many failed attempts may lock your IP
-- Verify `KEY` and `ADMIN` values match what you're using
-
-### Subscription Not Working
-- Verify the subscription token format: `?token=<MD5(host + userID)>`
-- Check UA header includes a browser fingerprint for non-proxy formats
-
-## License
-
-Private / Non-open-source. Developed for standard web application functionalities.
-
----
-
-Built for reliability and security. Not affiliated with Cloudflare or MEGA.
